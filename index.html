@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blogger CMS - Global GitHub Sync</title>
+    <style>
+        /* Base Reset & Variables */
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f9fafb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --white: #ffffff;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+        .hidden { display: none !important; }
+
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+            height: 64px;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+        .logo { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 700; font-size: 1.25rem; }
+
+        .logo-icon {
+            width: 32px; height: 32px; background: var(--primary); color: white;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        }
+
+        .btn-new {
+            background: #111827; color: white; padding: 0.5rem 1rem; border-radius: 8px;
+            border: none; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        /* Post Grid */
+        .posts-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2rem;
+        }
+
+        .post-card {
+            background: var(--white); border-radius: 1rem; overflow: hidden;
+            border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s;
+        }
+
+        .post-card:hover { transform: translateY(-4px); }
+        .post-card img { width: 100%; height: 180px; object-fit: cover; background: #eee; }
+        .post-card-body { padding: 1.25rem; }
+
+        /* Admin Layout */
+        .admin-layout { display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
+        @media (max-width: 768px) { .admin-layout { grid-template-columns: 1fr; } }
+
+        .admin-form-card {
+            background: var(--white); padding: 2rem; border-radius: 1.5rem;
+            border: 1px solid var(--border); margin-bottom: 2rem;
+        }
+
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; }
+        input, textarea {
+            width: 100%; padding: 0.75rem; border-radius: 0.5rem;
+            border: 1px solid var(--border); outline: none; font-family: inherit;
+        }
+
+        .image-upload-area {
+            border: 2px dashed var(--border); padding: 1rem; border-radius: 0.5rem;
+            text-align: center; cursor: pointer; background: #fafafa; margin-bottom: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary); color: white; padding: 0.75rem 1.5rem;
+            border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600; width: 100%;
+        }
+
+        .github-config {
+            background: #f1f5f9; padding: 1.5rem; border-radius: 1rem; margin-top: 1rem; font-size: 0.85rem;
+        }
+
+        /* Manage Posts List */
+        .manage-posts {
+            background: var(--white); padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border);
+            max-height: 600px; overflow-y: auto;
+        }
+        .manage-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+        }
+        .manage-info h4 { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .manage-actions { display: flex; gap: 0.5rem; }
+        .btn-edit { color: var(--primary); background: none; border: none; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .btn-delete { color: var(--danger); background: none; border: none; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+
+        .icon { width: 18px; height: 18px; fill: currentColor; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <div class="logo" onclick="showHome()">
+                <div class="logo-icon">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </div>
+                <span>DevBlog</span>
+            </div>
+            <button onclick="showAdmin()" class="btn-new">Admin Panel</button>
+        </div>
+    </nav>
+
+    <main class="container py-10">
+        <div id="feed-view">
+            <h1 style="margin-bottom: 2rem;">Recent Posts</h1>
+            <div id="posts-container" class="posts-grid"></div>
+        </div>
+
+        <div id="admin-view" class="hidden">
+            <div class="admin-layout">
+                <div class="admin-left">
+                    <div class="admin-form-card">
+                        <h2 id="form-title" style="margin-bottom: 1.5rem;">New Article</h2>
+                        <form id="post-form" onsubmit="handlePostSubmit(event)">
+                            <input type="hidden" id="edit-id">
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="post-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Post Image</label>
+                                <div class="image-upload-area" onclick="document.getElementById('file-input').click()">
+                                    <p id="file-label">Click to upload image or enter URL below</p>
+                                    <input type="file" id="file-input" class="hidden" accept="image/*" onchange="previewImage(this)">
+                                </div>
+                                <input type="text" id="post-image-url" placeholder="Or paste Image URL">
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <textarea id="post-content" rows="6" required></textarea>
+                            </div>
+                            <div style="display: flex; gap: 1rem;">
+                                <button type="submit" id="submit-btn" class="btn-primary">Add Post</button>
+                                <button type="button" id="cancel-edit" class="btn-secondary hidden" onclick="resetForm()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="github-config">
+                        <h3 style="margin-bottom: 0.5rem;">GitHub Sync (Cross-Browser)</h3>
+                        <div class="form-group">
+                            <input type="password" id="gh-token" placeholder="GitHub Token (PAT)">
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="gh-repo" placeholder="username/repo-name">
+                        </div>
+                        <button onclick="syncToGitHub()" class="btn-primary" style="background: #000;">
+                            Sync & Save to GitHub
+                        </button>
+                        <p id="sync-status" style="margin-top: 0.5rem; font-size: 0.8rem;"></p>
+                    </div>
+                </div>
+
+                <div class="admin-right">
+                    <div class="manage-posts">
+                        <h3 style="margin-bottom: 1rem;">Manage Posts</h3>
+                        <div id="manage-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="post-view" class="hidden">
+            <button onclick="showHome()" style="background:none; border:none; color:var(--primary); cursor:pointer; margin-bottom:2rem; font-weight: bold;">← Back to Home</button>
+            <article id="post-detail-content" style="background:white; padding:2rem; border-radius:1rem; border:1px solid var(--border);"></article>
+        </div>
+    </main>
+
+    <script>
+        let POSTS_DATA = [];
+        let base64Image = "";
+
+        // On Initialization
+        window.onload = async () => {
+            // Load credentials from local storage
+            document.getElementById('gh-token').value = localStorage.getItem('gh_token') || "";
+            document.getElementById('gh-repo').value = localStorage.getItem('gh_repo') || "";
+
+            const repo = localStorage.getItem('gh_repo');
+            if (repo) {
+                await fetchFromGitHub(repo);
+            } else {
+                const saved = localStorage.getItem('blog_data');
+                POSTS_DATA = saved ? JSON.parse(saved) : getDefaultPosts();
+                renderFeed();
+                renderManageList();
+            }
+        };
+
+        function getDefaultPosts() {
+            return [{
+                id: 1, title: "Welcome to DevBlog", excerpt: "Start by configuring GitHub in Admin...", 
+                image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&q=80&w=800", 
+                date: "Jan 1, 2024", author: "Admin", content: "To see your posts in other browsers, enter your GitHub info in the Admin panel and click Sync."
+            }];
+        }
+
+        async function fetchFromGitHub(repo) {
+            const status = document.getElementById('sync-status');
+            try {
+                // Use the raw.githubusercontent URL for public fetching
+                const url = `https://raw.githubusercontent.com/${repo}/main/data.json?t=${Date.now()}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    POSTS_DATA = await response.json();
+                    localStorage.setItem('blog_data', JSON.stringify(POSTS_DATA));
+                    renderFeed();
+                    renderManageList();
+                    if(status) status.innerText = "Loaded latest data from GitHub.";
+                }
+            } catch (e) {
+                console.error("GitHub fetch failed, using local storage", e);
+            }
+        }
+
+        function previewImage(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    base64Image = e.target.result;
+                    document.getElementById('file-label').innerText = "Image loaded!";
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handlePostSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-id').value;
+            const urlInput = document.getElementById('post-image-url').value;
+            
+            const postObj = {
+                id: editId ? parseInt(editId) : Date.now(),
+                title: document.getElementById('post-title').value,
+                excerpt: document.getElementById('post-content').value.substring(0, 100) + "...",
+                content: document.getElementById('post-content').value,
+                image: base64Image || urlInput || "https://via.placeholder.com/800x400",
+                date: new Date().toLocaleDateString(),
+                author: "Admin"
+            };
+
+            if (editId) {
+                const index = POSTS_DATA.findIndex(p => p.id === parseInt(editId));
+                POSTS_DATA[index] = postObj;
+            } else {
+                POSTS_DATA.unshift(postObj);
+            }
+
+            saveLocally();
+            resetForm();
+            renderFeed();
+            renderManageList();
+        }
+
+        function saveLocally() {
+            localStorage.setItem('blog_data', JSON.stringify(POSTS_DATA));
+        }
+
+        async function syncToGitHub() {
+            const token = document.getElementById('gh-token').value;
+            const repo = document.getElementById('gh-repo').value;
+            const status = document.getElementById('sync-status');
+
+            if (!token || !repo) {
+                status.innerText = "Error: Token and Repo are required for sync.";
+                status.style.color = "var(--danger)";
+                return;
+            }
+
+            // Save credentials for this browser
+            localStorage.setItem('gh_token', token);
+            localStorage.setItem('gh_repo', repo);
+
+            status.innerText = "Syncing...";
+            status.style.color = "var(--primary)";
+
+            try {
+                const path = "data.json";
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                
+                let sha = "";
+                const getFile = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
+                if (getFile.ok) {
+                    const data = await getFile.json();
+                    sha = data.sha;
+                }
+
+                // Properly encode content for GitHub API
+                const jsonString = JSON.stringify(POSTS_DATA, null, 2);
+                const content = btoa(unescape(encodeURIComponent(jsonString)));
+
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: "Sync data.json from CMS",
+                        content: content,
+                        sha: sha
+                    })
+                });
+
+                if (response.ok) {
+                    status.innerText = "Sync Complete! Data is now live.";
+                    status.style.color = "var(--success)";
+                } else {
+                    const err = await response.json();
+                    status.innerText = "Sync Error: " + err.message;
+                    status.style.color = "var(--danger)";
+                }
+            } catch (e) {
+                status.innerText = "Sync Failed: " + e.message;
+                status.style.color = "var(--danger)";
+            }
+        }
+
+        function renderFeed() {
+            const container = document.getElementById('posts-container');
+            container.innerHTML = POSTS_DATA.map(post => `
+                <div class="post-card" onclick="showPost(${post.id})">
+                    <img src="${post.image}" alt="">
+                    <div class="post-card-body">
+                        <h3>${post.title}</h3>
+                        <p>${post.excerpt}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderManageList() {
+            const container = document.getElementById('manage-list');
+            container.innerHTML = POSTS_DATA.map(post => `
+                <div class="manage-item">
+                    <div class="manage-info">
+                        <h4>${post.title}</h4>
+                        <span style="font-size:0.7rem;">${post.date}</span>
+                    </div>
+                    <div class="manage-actions">
+                        <button class="btn-edit" onclick="editPost(${post.id})">Edit</button>
+                        <button class="btn-delete" onclick="deletePost(${post.id})">Del</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function editPost(id) {
+            const post = POSTS_DATA.find(p => p.id === id);
+            if (!post) return;
+            document.getElementById('edit-id').value = post.id;
+            document.getElementById('post-title').value = post.title;
+            document.getElementById('post-content').value = post.content;
+            document.getElementById('post-image-url').value = post.image.startsWith('data:') ? "" : post.image;
+            document.getElementById('form-title').innerText = "Edit Post";
+            document.getElementById('submit-btn').innerText = "Update Post";
+            document.getElementById('cancel-edit').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function deletePost(id) {
+            if (confirm("Delete this post?")) {
+                POSTS_DATA = POSTS_DATA.filter(p => p.id !== id);
+                saveLocally();
+                renderFeed();
+                renderManageList();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('post-form').reset();
+            document.getElementById('edit-id').value = "";
+            base64Image = "";
+            document.getElementById('file-label').innerText = "Click to upload image or enter URL below";
+            document.getElementById('form-title').innerText = "New Article";
+            document.getElementById('submit-btn').innerText = "Add Post";
+            document.getElementById('cancel-edit').classList.add('hidden');
+        }
+
+        function showPost(id) {
+            const post = POSTS_DATA.find(p => p.id === id);
+            const content = document.getElementById('post-detail-content');
+            content.innerHTML = `
+                <h1 style="margin-bottom:1rem; font-size: 2.5rem;">${post.title}</h1>
+                <div style="color: var(--text-muted); margin-bottom: 1.5rem;">Published ${post.date}</div>
+                <img src="${post.image}" style="width:100%; border-radius:1rem; margin-bottom:2rem;">
+                <div style="line-height: 1.8; font-size: 1.1rem;">${post.content.replace(/\n/g, '<br>')}</div>
+            `;
+            toggleView('post-view');
+            window.scrollTo(0, 0);
+        }
+
+        function showHome() { toggleView('feed-view'); }
+        function showAdmin() { toggleView('admin-view'); }
+
+        function toggleView(id) {
+            ['feed-view', 'admin-view', 'post-view'].forEach(v => {
+                document.getElementById(v).classList.toggle('hidden', v !== id);
+            });
+        }
+    </script>
+</body>
+</html>
+
