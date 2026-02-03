@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blogger CMS - Live GitHub Data</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f9fafb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --white: #ffffff;
+            --border: #e5e7eb;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text-main); line-height: 1.5; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+        .hidden { display: none !important; }
+
+        nav { background: white; border-bottom: 1px solid var(--border); height: 64px; display: flex; align-items: center; position: sticky; top: 0; z-index: 50; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .logo { font-weight: 700; font-size: 1.25rem; cursor: pointer; color: var(--primary); }
+
+        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .btn-black { background: #111827; color: white; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; }
+        .btn-outline { background: white; border: 1px solid var(--border); width: 100%; }
+
+        .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem; padding-bottom: 4rem; }
+        .post-card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+        .post-card:hover { transform: translateY(-4px); }
+        .post-card img { width: 100%; height: 160px; object-fit: cover; }
+        .post-card-body { padding: 1rem; }
+
+        .login-screen { position: fixed; inset: 0; background: rgba(249, 250, 251, 0.98); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .card { background: white; padding: 2rem; border-radius: 16px; border: 1px solid var(--border); width: 100%; max-width: 400px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+
+        .admin-grid { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; margin-top: 2rem; }
+        @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } }
+
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; }
+        input, textarea { width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; }
+
+        .upload-box { border: 2px dashed var(--border); padding: 1.5rem; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 0.5rem; background: #fafafa; }
+        .manage-list { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+        .manage-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+        .manage-item:last-child { border-bottom: none; }
+        
+        #sync-status { font-size: 0.8rem; margin-top: 0.5rem; font-weight: 500; }
+        
+        #loader { text-align: center; padding: 2rem; color: var(--text-muted); font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <div class="logo" onclick="showHome()">DevBlog CMS</div>
+            <button onclick="checkAuth()" class="btn btn-black">Admin Panel</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Home View -->
+        <div id="home-view">
+            <div id="loader" class="hidden">Updating feed from GitHub...</div>
+            <div id="posts-container" class="posts-grid"></div>
+        </div>
+
+        <!-- Login View -->
+        <div id="login-view" class="hidden login-screen">
+            <div class="card">
+                <h2 style="margin-bottom: 1rem;">Admin Login</h2>
+                <input type="password" id="admin-pass" placeholder="Enter password" style="margin-bottom: 1rem;">
+                <button onclick="doLogin()" class="btn btn-primary">Enter</button>
+                <button onclick="showHome()" class="btn" style="width:100%; margin-top:0.5rem;">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Admin View -->
+        <div id="admin-view" class="hidden">
+            <div class="admin-grid">
+                <div>
+                    <div class="card" style="max-width: 100%; margin-bottom: 2rem;">
+                        <h2 id="form-title">New Post</h2>
+                        <form onsubmit="savePost(event)">
+                            <input type="hidden" id="edit-id">
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="post-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Image</label>
+                                <div class="upload-box" onclick="document.getElementById('file-in').click()">
+                                    <span id="file-status">Click to upload file</span>
+                                    <input type="file" id="file-in" class="hidden" accept="image/*" onchange="handleFile(this)">
+                                </div>
+                                <input type="text" id="post-image-url" placeholder="Or image URL">
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <textarea id="post-content" rows="8" required></textarea>
+                            </div>
+                            <button type="submit" id="save-btn" class="btn btn-primary">Save Post</button>
+                        </form>
+                    </div>
+
+                    <div class="card" style="max-width: 100%; background: #f1f5f9;">
+                        <h3>GitHub Configuration</h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Setup your repo to load data in any browser.</p>
+                        <input type="password" id="gh-token" placeholder="GitHub Token" style="margin-bottom:0.5rem;">
+                        <input type="text" id="gh-repo" placeholder="username/repo" style="margin-bottom:1rem;">
+                        <div style="display:flex; gap:0.5rem;">
+                            <button onclick="syncToGitHub()" class="btn btn-black" style="flex:1;">Push to GitHub</button>
+                            <button onclick="manualFetch()" class="btn btn-outline" style="flex:1;">Fetch from GitHub</button>
+                        </div>
+                        <p id="sync-status"></p>
+                    </div>
+                </div>
+
+                <div class="manage-list">
+                    <h3>Manage Posts</h3>
+                    <div id="admin-list" style="margin-top: 1rem;"></div>
+                    <button onclick="logout()" class="btn btn-outline" style="margin-top:2rem; color:var(--danger);">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post Detail View -->
+        <div id="post-view" class="hidden">
+            <button onclick="showHome()" class="btn btn-outline" style="width:auto; margin: 2rem 0;">← Back</button>
+            <div id="post-detail" class="card" style="max-width: 100%; padding: 3rem;"></div>
+        </div>
+    </main>
+
+    <script>
+        let posts = [];
+        let base64 = "";
+        let authed = sessionStorage.getItem('cms_auth') === 'true';
+        const PASS = "0000";
+        // Default Repository
+        const DEFAULT_REPO = "iamsourabhalder/";
+
+        window.onload = async () => {
+            const savedRepo = localStorage.getItem('gh_repo') || DEFAULT_REPO;
+            const savedToken = localStorage.getItem('gh_token');
+            
+            // Set input values
+            document.getElementById('gh-repo').value = savedRepo;
+            if(savedToken) document.getElementById('gh-token').value = savedToken;
+
+            // Priority: Load from GitHub if repo is available (using default if none saved)
+            if (savedRepo) {
+                await manualFetch(true); 
+            } else {
+                const local = localStorage.getItem('cms_posts');
+                posts = local ? JSON.parse(local) : [];
+                render();
+            }
+        };
+
+        function checkAuth() { authed ? showAdmin() : toggle('login-view'); }
+        
+        function doLogin() {
+            if (document.getElementById('admin-pass').value === PASS) {
+                authed = true;
+                sessionStorage.setItem('cms_auth', 'true');
+                showAdmin();
+            } else { 
+                alert('Wrong password'); 
+            }
+        }
+        
+        function logout() { sessionStorage.clear(); authed = false; showHome(); }
+
+        function handleFile(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => { 
+                    base64 = e.target.result; 
+                    document.getElementById('file-status').innerText = "Image Selected!";
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function manualFetch(isInitial = false) {
+            const repo = document.getElementById('gh-repo').value;
+            const status = document.getElementById('sync-status');
+            const loader = document.getElementById('loader');
+            
+            if(!repo || repo === "/") return;
+
+            if (isInitial) loader.classList.remove('hidden');
+            if (status) status.innerText = "Fetching from GitHub...";
+
+            try {
+                const url = `https://raw.githubusercontent.com/iamsourabhalder/news/main/data.json?nocache=${Date.now()}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    posts = await res.json();
+                    localStorage.setItem('cms_posts', JSON.stringify(posts));
+                    render();
+                    if(status) { 
+                        status.innerText = "Data loaded from GitHub successfully."; 
+                        status.style.color = "var(--success)"; 
+                    }
+                } else {
+                    throw new Error("File not found on GitHub");
+                }
+            } catch (e) {
+                console.error("GitHub Fetch Error:", e);
+                if(status) { 
+                    status.innerText = "Load failed. Check repo name or if data.json is public."; 
+                    status.style.color = "var(--danger)"; 
+                }
+                const local = localStorage.getItem('cms_posts');
+                posts = local ? JSON.parse(local) : [];
+                render();
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function savePost(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const newPost = {
+                id: id ? parseInt(id) : Date.now(),
+                title: document.getElementById('post-title').value,
+                content: document.getElementById('post-content').value,
+                image: base64 || document.getElementById('post-image-url').value || "https://via.placeholder.com/600x400",
+                date: new Date().toLocaleDateString()
+            };
+
+            if (id) {
+                const idx = posts.findIndex(p => p.id === parseInt(id));
+                posts[idx] = newPost;
+            } else {
+                posts.unshift(newPost);
+            }
+
+            localStorage.setItem('cms_posts', JSON.stringify(posts));
+            resetForm();
+            render();
+            alert("Saved locally! Use 'Push to GitHub' to sync with other browsers.");
+        }
+
+        async function syncToGitHub() {
+            const token = document.getElementById('gh-token').value;
+            const repo = document.getElementById('gh-repo').value;
+            const status = document.getElementById('sync-status');
+
+            if (!token || !repo) return alert("GitHub Token and Repo are required for sync.");
+            
+            localStorage.setItem('gh_token', token);
+            localStorage.setItem('gh_repo', repo);
+            status.innerText = "Uploading to GitHub...";
+            status.style.color = "var(--text-main)";
+
+            try {
+                const url = `https://api.github.com/repos/${repo}/contents/data.json`;
+                let sha = "";
+                
+                const getFile = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
+                if (getFile.ok) {
+                    const d = await getFile.json();
+                    sha = d.sha;
+                }
+
+                const jsonString = JSON.stringify(posts, null, 2);
+                const b64Content = btoa(unescape(encodeURIComponent(jsonString)));
+
+                const res = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: "CMS Content Update", 
+                        content: b64Content, 
+                        sha: sha 
+                    })
+                });
+
+                if (res.ok) {
+                    status.innerText = "GitHub updated successfully!";
+                    status.style.color = "var(--success)";
+                } else {
+                    const err = await res.json();
+                    status.innerText = "GitHub Error: " + err.message;
+                    status.style.color = "var(--danger)";
+                }
+            } catch (e) {
+                status.innerText = "Sync Failed: " + e.message;
+                status.style.color = "var(--danger)";
+            }
+        }
+
+        function render() {
+            const container = document.getElementById('posts-container');
+            if (posts.length === 0) {
+                container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding-top: 3rem;">No posts found. Configure GitHub in Admin to load data.</p>';
+            } else {
+                container.innerHTML = posts.map(p => `
+                    <div class="post-card" onclick="viewPost(${p.id})">
+                        <img src="${p.image}" onerror="this.src='https://via.placeholder.com/400x200?text=No+Image'">
+                        <div class="post-card-body">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">${p.title}</h3>
+                            <p style="color:var(--text-muted); font-size:0.8rem;">${p.date}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const adminList = document.getElementById('admin-list');
+            if(adminList && authed) {
+                adminList.innerHTML = posts.map(p => `
+                    <div class="manage-item">
+                        <span style="font-size: 0.85rem; font-weight: 500;">${p.title.substring(0,25)}${p.title.length > 25 ? '...' : ''}</span>
+                        <div>
+                            <button onclick="loadEdit(${p.id})" style="color:var(--primary); background:none; border:none; cursor:pointer; margin-right:10px; font-weight:600;">Edit</button>
+                            <button onclick="delPost(${p.id})" style="color:var(--danger); background:none; border:none; cursor:pointer; font-weight:600;">Del</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function loadEdit(id) {
+            const p = posts.find(x => x.id === id);
+            document.getElementById('edit-id').value = p.id;
+            document.getElementById('post-title').value = p.title;
+            document.getElementById('post-content').value = p.content;
+            document.getElementById('post-image-url').value = (p.image && p.image.startsWith('data:')) ? "" : p.image;
+            document.getElementById('form-title').innerText = "Edit Post";
+            document.getElementById('save-btn').innerText = "Update Post";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function delPost(id) {
+            if(confirm("Are you sure you want to delete this post?")) {
+                posts = posts.filter(p => p.id !== id);
+                localStorage.setItem('cms_posts', JSON.stringify(posts));
+                render();
+            }
+        }
+
+        function viewPost(id) {
+            const p = posts.find(x => x.id === id);
+            document.getElementById('post-detail').innerHTML = `
+                <img src="${p.image}" onerror="this.src='https://via.placeholder.com/800x400?text=No+Image'" style="width:100%; border-radius:12px; margin-bottom:2rem; max-height: 400px; object-fit: cover;">
+                <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">${p.title}</h1>
+                <p style="color:var(--text-muted); margin-bottom:2rem; font-weight: 500;">${p.date}</p>
+                <div style="font-size:1.15rem; line-height:1.8; white-space: pre-wrap; color: #374151;">${p.content}</div>
+            `;
+            toggle('post-view');
+            window.scrollTo(0, 0);
+        }
+
+        function resetForm() {
+            document.getElementById('edit-id').value = "";
+            document.getElementById('post-title').value = "";
+            document.getElementById('post-content').value = "";
+            document.getElementById('post-image-url').value = "";
+            document.getElementById('file-status').innerText = "Click to upload file";
+            base64 = "";
+            document.getElementById('form-title').innerText = "New Post";
+            document.getElementById('save-btn').innerText = "Save Post";
+        }
+
+        function toggle(id) {
+            ['home-view', 'admin-view', 'post-view', 'login-view'].forEach(v => {
+                document.getElementById(v).classList.toggle('hidden', v !== id);
+            });
+        }
+        function showHome() { toggle('home-view'); render(); }
+        function showAdmin() { toggle('admin-view'); render(); }
+    </script>
+</body>
+</html>
+
