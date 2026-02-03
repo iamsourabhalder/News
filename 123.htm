@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Data Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+        [box-shadow] { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+    <div id="app" class="max-w-6xl mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">GitHub Data Manager</h1>
+                <p class="text-slate-500 mt-1">Easily update your website's JSON content</p>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+                <button onclick="setView('grid')" id="btn-grid" class="flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-all bg-blue-600 text-white shadow-md">
+                    <i data-lucide="layout" class="w-4 h-4"></i> Visual
+                </button>
+                <button onclick="setView('json')" id="btn-json" class="flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-all text-slate-600 hover:bg-slate-100">
+                    <i data-lucide="code" class="w-4 h-4"></i> JSON Editor
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="grid-view" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Items injected here -->
+        </main>
+
+        <main id="json-view" class="hidden bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden">
+            <div class="flex justify-between items-center px-6 py-4 bg-slate-800/50 border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 font-mono text-sm">data.json</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="copyToClipboard()" class="flex items-center gap-2 text-xs font-semibold bg-slate-700 text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors">
+                        <i data-lucide="copy" id="copy-icon" class="w-3.5 h-3.5"></i> <span id="copy-text">Copy</span>
+                    </button>
+                    <button onclick="downloadJson()" class="flex items-center gap-2 text-xs font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Download
+                    </button>
+                </div>
+            </div>
+            <textarea id="json-textarea" oninput="handleJsonInput(this.value)" class="w-full h-[500px] bg-slate-900 text-blue-300 font-mono text-sm p-6 outline-none resize-none focus:bg-slate-900/80 transition-colors" spellcheck="false"></textarea>
+        </main>
+
+        <!-- Modal -->
+        <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h2 id="modal-title" class="text-2xl font-bold text-slate-900">Edit Item</h2>
+                        <p class="text-slate-500 text-sm">Complete the fields below</p>
+                    </div>
+                    <button onclick="closeModal()" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                
+                <div class="p-8 space-y-5">
+                    <input type="hidden" id="edit-id">
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-semibold text-slate-700 ml-1">Title</label>
+                        <input id="edit-title" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" placeholder="Project name...">
+                    </div>
+                    
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-semibold text-slate-700 ml-1">Image URL</label>
+                        <input id="edit-image" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" placeholder="https://...">
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-semibold text-slate-700 ml-1">Description</label>
+                        <textarea id="edit-desc" rows="4" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all resize-none" placeholder="Brief details..."></textarea>
+                    </div>
+                </div>
+
+                <div class="p-8 pt-0 flex gap-4">
+                    <button onclick="closeModal()" class="flex-1 px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50">Cancel</button>
+                    <button onclick="saveItem()" class="flex-[2] px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center justify-center gap-2 transition-all active:scale-95">
+                        <i data-lucide="save" class="w-5 h-5"></i> Save Entry
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Management
+        let items = [
+            { id: "1", title: "Project Alpha", description: "A high-performance dashboard for data analytics.", image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&q=80" },
+            { id: "2", title: "Mobile App Design", description: "Modern UI/UX kit for fitness tracking.", image: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=500&q=80" }
+        ];
+
+        // View Control
+        function setView(mode) {
+            const grid = document.getElementById('grid-view');
+            const json = document.getElementById('json-view');
+            const btnGrid = document.getElementById('btn-grid');
+            const btnJson = document.getElementById('btn-json');
+
+            if (mode === 'grid') {
+                grid.classList.remove('hidden');
+                json.classList.add('hidden');
+                btnGrid.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+                btnGrid.classList.remove('text-slate-600', 'hover:bg-slate-100');
+                btnJson.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                btnJson.classList.add('text-slate-600', 'hover:bg-slate-100');
+                renderGrid();
+            } else {
+                grid.classList.add('hidden');
+                json.classList.remove('hidden');
+                btnJson.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+                btnJson.classList.remove('text-slate-600', 'hover:bg-slate-100');
+                btnGrid.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                btnGrid.classList.add('text-slate-600', 'hover:bg-slate-100');
+                document.getElementById('json-textarea').value = JSON.stringify(items, null, 2);
+            }
+        }
+
+        // Render Cards
+        function renderGrid() {
+            const container = document.getElementById('grid-view');
+            container.innerHTML = `
+                <button onclick="openModal('new')" class="group border-2 border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all h-full min-h-[320px]">
+                    <div class="p-5 bg-slate-100 rounded-full group-hover:bg-blue-100 transition-all">
+                        <i data-lucide="plus" class="w-8 h-8"></i>
+                    </div>
+                    <span class="font-semibold text-lg">Add New Item</span>
+                </button>
+            `;
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col";
+                card.innerHTML = `
+                    <div class="h-44 overflow-hidden bg-slate-100 relative">
+                        <img src="${item.image || 'https://placehold.co/600x400?text=No+Image'}" 
+                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                             onerror="this.src='https://placehold.co/600x400?text=Error+Loading'">
+                        <div class="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openModal('${item.id}')" class="p-2 bg-white/90 shadow-sm text-blue-600 rounded-full hover:bg-blue-600 hover:text-white transition-colors">
+                                <i data-lucide="edit-2" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteItem('${item.id}')" class="p-2 bg-white/90 shadow-sm text-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-slate-800 mb-2 truncate">${item.title}</h3>
+                        <p class="text-slate-500 text-sm leading-relaxed line-clamp-3 italic">${item.description || ''}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // Data Actions
+        function openModal(id) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modal-title');
+            const editId = document.getElementById('edit-id');
+            const editTitle = document.getElementById('edit-title');
+            const editImage = document.getElementById('edit-image');
+            const editDesc = document.getElementById('edit-desc');
+
+            if (id === 'new') {
+                title.innerText = "Add New Item";
+                editId.value = "new";
+                editTitle.value = "";
+                editImage.value = "";
+                editDesc.value = "";
+            } else {
+                const item = items.find(i => i.id === id);
+                title.innerText = "Edit Item";
+                editId.value = item.id;
+                editTitle.value = item.title;
+                editImage.value = item.image;
+                editDesc.value = item.description;
+            }
+
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        function saveItem() {
+            const id = document.getElementById('edit-id').value;
+            const title = document.getElementById('edit-title').value;
+            const image = document.getElementById('edit-image').value;
+            const description = document.getElementById('edit-desc').value;
+
+            if (!title) return alert("Title is required");
+
+            if (id === 'new') {
+                items.unshift({ id: Date.now().toString(), title, image, description });
+            } else {
+                const idx = items.findIndex(i => i.id === id);
+                items[idx] = { id, title, image, description };
+            }
+
+            closeModal();
+            renderGrid();
+        }
+
+        function deleteItem(id) {
+            if (confirm("Delete this item?")) {
+                items = items.filter(i => i.id !== id);
+                renderGrid();
+            }
+        }
+
+        function handleJsonInput(value) {
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) items = parsed;
+            } catch (e) {}
+        }
+
+        function downloadJson() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "data.json");
+            dlAnchorElem.click();
+        }
+
+        function copyToClipboard() {
+            const text = JSON.stringify(items, null, 2);
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const copyBtnText = document.getElementById('copy-text');
+            copyBtnText.innerText = "Copied!";
+            setTimeout(() => copyBtnText.innerText = "Copy", 2000);
+        }
+
+        // Initialize
+        window.onload = () => {
+            renderGrid();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
+
