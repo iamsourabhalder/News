@@ -21,4 +21,8 @@ rad.json
 #Test results file
 TestResults.xml
 
-Me.html
+# hide Me.html file
+
+git rm --cached Me.html
+git commit -m "Remove Me.html from tracking"
+git push
